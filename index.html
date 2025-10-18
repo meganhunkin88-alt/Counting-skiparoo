@@ -8,39 +8,157 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#22c55e">
 <style>
-body{font-family:sans-serif;text-align:center;background:#fffdf8;color:#333;margin:0;padding:0}
-h1{color:#22c55e;margin:20px 0}
-button{background:#22c55e;color:#fff;border:none;border-radius:10px;padding:15px 25px;font-size:1.2em;margin:10px}
-button:active{background:#1ea34d}
-#number{font-size:6em;margin:20px 0;color:#f59e0b}
-#stars{font-size:2em;margin-top:10px;color:#facc15}
+  body{font-family:ui-rounded,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#fffdf8;margin:0;color:#1f2937;text-align:center}
+  header{padding:18px 12px;font-weight:900;font-size:20px;color:#22c55e}
+  main{max-width:720px;margin:0 auto;padding:0 16px 24px}
+  .card{background:#fff;border-radius:18px;box-shadow:0 8px 24px rgba(0,0,0,.08);padding:16px}
+  .row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center}
+  select,button{border:0;border-radius:14px;padding:12px 16px;font-size:16px}
+  button.primary{background:#22c55e;color:#fff;font-weight:800}
+  button.ghost{background:#eef2ff;color:#111}
+  button:active{transform:scale(.98)}
+  #big{font-size:min(22vw,120px);line-height:1;font-weight:900;color:#f59e0b;margin:8px 0 0}
+  #hint{color:#6b7280;font-weight:700;margin:6px 0 10px}
+  .hud{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px}
+  .score{font-weight:900}
+  .stars{font-size:24px}
+  .progress{height:10px;background:#eef2ff;border-radius:999px;overflow:hidden;margin-top:10px}
+  .bar{height:100%;width:0;background:linear-gradient(90deg,#22c55e,#16a34a);transition:width .3s}
+  .msg{margin-top:6px;color:#6b7280}
 </style>
 </head>
 <body>
-<h1>🦅 Counting Skiparoo</h1>
-<div id="number">1</div>
-<button id="next">Next</button>
-<button id="back" disabled>Back</button>
-<div id="stars">⭐️</div>
+<header>🦅 Counting <span style="color:#111">Skiparoo</span></header>
+<main>
+  <div class="card">
+    <div class="row" style="margin-bottom:8px">
+      <select id="mode">
+        <option value="f1">Count forward (1s)</option>
+        <option value="b1">Count backward (1s)</option>
+        <option value="f2">Count forward (by 2s)</option>
+        <option value="b2">Count backward (by 2s)</option>
+      </select>
+      <button id="start" class="primary">Start</button>
+      <button id="reset" class="ghost">Reset</button>
+    </div>
+
+    <div class="hud">
+      <div class="score" id="score">Score: 0</div>
+      <div class="stars" id="stars"></div>
+    </div>
+    <div class="progress"><div class="bar" id="bar"></div></div>
+
+    <div id="hint">Tap the next number</div>
+    <div id="big">—</div>
+
+    <div class="row" style="margin-top:8px; justify-content:center; gap:10px;">
+      <button id="backBtn" class="ghost">Back</button>
+      <button id="btn" class="primary">Next</button>
+    </div>
+
+    <div id="msg" class="msg"></div>
+  </div>
+</main>
 
 <script>
-let count = 1;
-const number = document.getElementById("number");
-const stars = document.getElementById("stars");
-const next = document.getElementById("next");
-const back = document.getElementById("back");
+  // Elements
+  const modeSel = document.getElementById('mode');
+  const startBtn = document.getElementById('start');
+  const resetBtn = document.getElementById('reset');
+  const btn = document.getElementById('btn');
+  const backBtn = document.getElementById('backBtn');
+  const big = document.getElementById('big');
+  const hint = document.getElementById('hint');
+  const scoreEl = document.getElementById('score');
+  const starsEl = document.getElementById('stars');
+  const bar = document.getElementById('bar');
+  const msg = document.getElementById('msg');
 
-function updateDisplay(){
-  number.textContent = count;
-  stars.textContent = "⭐️".repeat(Math.floor(count/10));
-  back.disabled = count === 1;
-  next.disabled = count === 100;
-}
+  // State
+  let step=1, dir=+1, start=0, end=100, value=0, score=0, progress=0, totalSteps=0;
 
-next.onclick = ()=>{if(count<100){count++;updateDisplay()}};
-back.onclick = ()=>{if(count>1){count--;updateDisplay()}};
+  function setMode(k){
+    if(k==='f1'){step=1;dir=+1;start=0;end=100;btn.textContent='Next';hint.textContent='Tap the next number';}
+    if(k==='b1'){step=1;dir=-1;start=100;end=0;btn.textContent='Back';hint.textContent='Tap the previous number';}
+    if(k==='f2'){step=2;dir=+1;start=0;end=100;btn.textContent='Next +2';hint.textContent='Tap the next number (by 2s)';}
+    if(k==='b2'){step=2;dir=-1;start=100;end=0;btn.textContent='Back -2';hint.textContent='Tap the previous number (by 2s)';}
+    totalSteps = Math.floor(Math.abs(end-start)/step);
+  }
 
-updateDisplay();
+  function drawStars(s){
+    const n = Math.min(10, Math.floor(s/10));
+    starsEl.textContent = '⭐️'.repeat(n);
+  }
+
+  function updateHUD(){
+    scoreEl.textContent = 'Score: ' + score;
+    bar.style.width = (progress/Math.max(totalSteps,1)*100) + '%';
+  }
+
+  function confetti(){
+    const em=['🎉','✨','🌟','🎈','💥','🦅','⭐️'];
+    for(let i=0;i<18;i++){
+      const s=document.createElement('span');
+      s.textContent=em[Math.floor(Math.random()*em.length)];
+      s.style.position='fixed';
+      s.style.left=(5+Math.random()*90)+'vw';
+      s.style.top='-10vh';
+      s.style.fontSize=(16+Math.random()*22)+'px';
+      s.style.transition='transform 1.2s ease-out, opacity 1.2s';
+      document.body.appendChild(s);
+      setTimeout(()=>{s.style.transform=`translateY(${90+Math.random()*30}vh)`;s.style.opacity='.0';},20);
+      setTimeout(()=>s.remove(),1400);
+    }
+  }
+
+  function startGame(){
+    setMode(modeSel.value);
+    value = start;
+    score = 0; progress = 0; msg.textContent='';
+    big.textContent = value;
+    drawStars(0);
+    updateHUD();
+  }
+
+  function stepOnce(){
+    const next = value + step*dir;
+    if((dir>0 && value>=end) || (dir<0 && value<=end)){
+      msg.innerHTML = '<b>Great job!</b> Sequence finished.';
+      confetti();
+      return;
+    }
+    value = next;
+    big.textContent = value;
+    score += 10;
+    progress += 1;
+    if(progress % 10 === 0){ msg.textContent = '⭐️ Bonus!'; } else { msg.textContent = ''; }
+    drawStars(progress);
+    updateHUD();
+    if((dir>0 && value>=end) || (dir<0 && value<=end)){
+      msg.innerHTML = '<b>Great job!</b> Sequence finished.';
+      confetti();
+    }
+  }
+
+  // Back button logic
+  backBtn.addEventListener('click', ()=>{
+    const prev = value - step*dir;
+    if((dir>0 && value<=start) || (dir<0 && value>=start)) return;
+    value = prev;
+    big.textContent = value;
+    if(score > 0) score -= 5;
+    msg.textContent = '⬅️ Back one step';
+    updateHUD();
+  });
+
+  // Events
+  startBtn.addEventListener('click', startGame);
+  resetBtn.addEventListener('click', startGame);
+  modeSel.addEventListener('change', startGame);
+  btn.addEventListener('click', stepOnce);
+
+  // boot
+  startGame();
 </script>
 </body>
 </html>
